@@ -6,7 +6,7 @@
 /*   By: ckurtul <ckurtul@student.42istanbul.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/21 18:26:11 by ckurtul           #+#    #+#             */
-/*   Updated: 2026/05/21 18:29:22 by ckurtul          ###   ########.fr       */
+/*   Updated: 2026/05/22 02:33:59 by ckurtul          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,15 +14,15 @@
 
 char	*ft_strchr(const char *s, int c)
 {
-	size_t			i;
 	unsigned char	k;
 	unsigned char	*p;
+	size_t			i;
 
 	if (!s)
 		return (NULL);
-	i = 0;
 	k = (unsigned char)c;
 	p = (unsigned char *)s;
+	i = 0;
 	while (p[i])
 	{
 		if (p[i] == k)
@@ -50,9 +50,12 @@ char	*ft_strjoin(char *s1, const char *s2)
 	i = -1;
 	while (s1[++i])
 		res[i] = s1[i];
-	j = -1;
-	while (s2[++j])
+	j = 0;
+	while (s2[j])
+	{
 		res[i + j] = s2[j];
+		j++;
+	}
 	res[i + j] = '\0';
 	return (free(s1), res);
 }
@@ -74,13 +77,37 @@ char	*ft_strdup(const char *s)
 	char	*res;
 	size_t	i;
 
-	i = 0;
 	res = malloc(ft_strlen(s) + 1);
 	if (!res)
 		return (NULL);
+	i = 0;
 	while (s[i])
 	{
 		res[i] = s[i];
+		i++;
+	}
+	res[i] = '\0';
+	return (res);
+}
+
+char	*ft_substr(char const *s, unsigned int start, size_t len)
+{
+	char	*res;
+	size_t	i;
+
+	if (!s)
+		return (NULL);
+	if (start >= ft_strlen(s))
+		return (ft_strdup(""));
+	if (len > ft_strlen(s) - start)
+		len = ft_strlen(s) - start;
+	res = malloc(len + 1);
+	if (!res)
+		return (NULL);
+	i = 0;
+	while (i < len)
+	{
+		res[i] = s[start + i];
 		i++;
 	}
 	res[i] = '\0';

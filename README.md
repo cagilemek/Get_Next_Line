@@ -1,42 +1,37 @@
-# get_next_line
- 
 *This project has been created as part of the 42 curriculum by ckurtul.*
- 
+
+# get_next_line
+
 ## Description
- 
+
 **get_next_line** is a C function that reads and returns a single line from a file descriptor every time it is called. The returned line includes the terminating `\n` character if it exists, otherwise it returns the remaining content until EOF.
- 
-This project focuses on:
- 
-- Buffered file reading with `read()`
-- Persistent memory management using a `static` variable
-- Dynamic memory allocation
-- Preventing memory leaks and byte loss between function calls
- 
-The core idea of the project is storing unread data inside a static variable called `stash`, allowing the function to continue exactly where the previous call stopped.
- 
+
+The goal of this project is to implement a function that can be called in a loop to read a text file line by line, without reading the whole file at once. It introduces key concepts such as buffered I/O, static variables for persistent state, and careful dynamic memory management.
+
+The core idea is storing unread data inside a static variable called `stash`, allowing the function to continue exactly where the previous call stopped.
+
 ---
- 
-# Compilation
- 
+
+## Instructions
+
+### Compilation
+
 ```bash
 cc -Wall -Wextra -Werror -D BUFFER_SIZE=42 \
 get_next_line.c get_next_line_utils.c main.c
 ```
- 
+
 You can test different buffer sizes:
- 
+
 ```bash
 -D BUFFER_SIZE=1
 -D BUFFER_SIZE=9999
 ```
- 
+
 The function works correctly regardless of the buffer size.
- 
----
- 
-# Usage
- 
+
+### Usage
+
 ```c
 #include "get_next_line.h"
 #include <fcntl.h>
@@ -62,42 +57,80 @@ int	main(void)
 	return (0);
 }
 ```
- 
+
 ---
- 
-# Project Structure
- 
-## `get_next_line.c`
- 
+
+## Algorithm
+
+### Why a Static Stash?
+
+The central challenge of `get_next_line` is that `read()` does not know where a line ends — it reads raw bytes in fixed-size chunks (`BUFFER_SIZE`). A single `read()` call may return half a line, one full line, or several lines at once depending on the buffer size and file content.
+
+To handle this, a `static char *stash` is used to persist leftover data between calls. Every time `get_next_line` is called, it:
+
+1. Reads from the file descriptor in `BUFFER_SIZE` chunks via `readfd`, appending each chunk to `stash` using `append_stash`.
+2. Stops reading when a `\n` is found in `stash` or EOF is reached.
+3. Extracts the first line from `stash` using `cut_line` (which internally uses `ft_substr`).
+4. Cleans `stash` via `clean_stash`, keeping only the content after the extracted line for the next call.
+5. Returns the extracted line to the caller.
+
+### Why ft_substr Instead of ft_strjoin for Line Extraction?
+
+`ft_substr` was chosen for `cut_line` because it allows directly slicing a known portion of `stash` without needing to allocate and copy an intermediate result. Given that `line_len` already calculates the exact length of the current line, `ft_substr` produces the result in a single allocation.
+
+### Memory Management Strategy
+
+Each `append_stash` call frees the old `stash` after joining it with the new buffer, so there is never more than one live copy of the accumulated data. On error or EOF, `stash` is freed and set to `NULL` to prevent leaks across multiple calls.
+
+### Example Walkthrough
+
+```text
+BUFFER_SIZE = 5, file content: "Hello\nWorld"
+
+read() call 1 → buffer = "Hello"   stash = "Hello"
+read() call 2 → buffer = "\nWorl"  stash = "Hello\nWorl"   → \n found, stop reading
+cut_line()    → line   = "Hello\n"
+clean_stash() → stash  = "Worl"
+
+Next get_next_line() call:
+read() call 3 → buffer = "d"       stash = "World"
+EOF reached   → stop reading
+cut_line()    → line   = "World"
+clean_stash() → stash  = NULL
+```
+
+---
+
+## Project Structure
+
+### `get_next_line.c`
+
 | Function | Description |
 |---|---|
 | `get_next_line` | Main function that manages the reading process and returns one line at a time. |
 | `readfd` | Reads from the file descriptor and appends data into the stash until `\n` or EOF is found. |
-| `cut_line` | Extracts the current line from the stash. |
+| `cut_line` | Extracts the current line from the stash using `ft_substr`. |
 | `clean_stash` | Removes the extracted line from the stash and keeps the remaining content. |
 | `line_len` | Calculates the length of the next line including `\n`. |
- 
----
- 
-## `get_next_line_utils.c`
- 
+
+### `get_next_line_utils.c`
+
 | Function | Description |
 |---|---|
 | `ft_strlen` | Returns the length of a string. |
 | `ft_strchr` | Searches for a character inside a string. |
 | `ft_strdup` | Creates a duplicate of a string using dynamic allocation. |
-| `ft_strjoin` | Concatenates two strings and frees the first string to avoid memory leaks. |
- 
----
- 
-## `get_next_line.h`
- 
+| `ft_substr` | Extracts a substring from a string using start index and length. |
+| `append_stash` | Concatenates the buffer into the stash and frees the old stash to avoid memory leaks. |
+
+### `get_next_line.h`
+
 Contains:
- 
+
 - Function prototypes
 - Required libraries
 - `BUFFER_SIZE` macro definition
- 
+
 ```c
 #ifndef GET_NEXT_LINE_H
 # define GET_NEXT_LINE_H
@@ -111,165 +144,29 @@ Contains:
 
 char	*ft_strchr(const char *s, int c);
 char	*ft_strjoin(char *s1, const char *s2);
+char	*ft_substr(char const *s, unsigned int start, size_t len);
 char	*ft_strdup(const char *s);
 size_t	ft_strlen(const char *s);
+char	*append_stash(char *stash, char *buffer);
 char	*get_next_line(int fd);
 
 #endif
 ```
- 
----
- 
-# How It Works
- 
-## 1. Static Variable Persistence
- 
-```c
-static char *stash;
-```
- 
-The static variable stores leftover data between function calls.
- 
-Example:
- 
-```text
-First call:
-"Hello\nNext"
 
-Returned:
-"Hello\n"
+---
 
-stash becomes:
-"Next"
-```
- 
-This allows `get_next_line` to continue reading without losing bytes.
- 
----
- 
-## 2. Reading From File Descriptor
- 
-```text
-read()
-   ↓
-buffer
-   ↓
-ft_strjoin()
-   ↓
-stash
-```
- 
-The `readfd` function:
- 
-- Allocates a temporary buffer
-- Reads `BUFFER_SIZE` bytes
-- Appends them into `stash`
-- Stops when:
-  - `\n` is found
-  - or EOF is reached
- 
----
- 
-## 3. Extracting the Line
- 
-`cut_line()` copies:
- 
-```text
-stash = "hello world\nnext line"
-```
- 
-into:
- 
-```text
-line = "hello world\n"
-```
- 
----
- 
-## 4. Cleaning the Stash
- 
-After extracting the line:
- 
-```text
-stash before:
-"hello world\nnext line"
-```
- 
-becomes:
- 
-```text
-stash after:
-"next line"
-```
- 
-This remaining content is preserved for the next function call.
- 
----
- 
-# Memory Management
- 
-| Situation | Action |
-|---|---|
-| `ft_strjoin` | Frees old stash after joining |
-| `read()` error | Frees buffer and stash |
-| Empty stash at EOF | Frees stash and returns `NULL` |
-| Allocation failure | Returns `NULL` safely |
- 
----
- 
-# Technical Notes
- 
-- Uses only allowed functions:
-  - `read`
-  - `malloc`
-  - `free`
-- Fully compatible with:
-  - very small `BUFFER_SIZE`
-  - very large `BUFFER_SIZE`
-- Handles:
-  - files
-  - stdin
-  - multiple line lengths
-  - EOF without newline
- 
----
- 
-# Example
- 
-Input file:
- 
-```text
-Hello
-World
-42
-```
- 
-Program output:
- 
-```text
-Hello
-World
-42
-```
- 
----
- 
-# Resources
- 
-- `man 2 read`
-- `man 3 malloc`
-- POSIX file descriptor documentation
+## Resources
+
+- `man 2 read` — POSIX read() system call documentation
+- `man 3 malloc` — Dynamic memory allocation reference
 - 42 School get_next_line subject
- 
----
- 
-# AI Usage & Academic Integrity
- 
+
+### AI Usage
+
 AI tools were used only as educational assistance for:
- 
-- Understanding stash management
+
+- Understanding stash management between calls
 - Discussing edge cases
-- Debugging memory handling
 - Improving README documentation
- 
+
 All source code was written, tested, and validated manually by ckurtul.
